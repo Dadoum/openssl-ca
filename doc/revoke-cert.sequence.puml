@@ -1,0 +1,41 @@
+@startuml
+participant ca.c
+participant X509
+database Certifactes
+group Revoke certificate
+    ca.c -> Certifactes : revokeCert(cert)
+    ca.c <-- Certifactes : SUCCESS | FAILURE
+end
+group Initialize Certificate Revocation List
+    ca.c -> X509 : X509_CRL_new()
+    ca.c <-- X509 : X509_CRL *crl
+    ca.c -> X509 : X509_get_subject_name(caCert)
+    ca.c <-- X509 : X509_NAME *caName
+    ca.c -> X509 : X509_CRL_set_issuer_name(caName)
+    ca.c <-- X509 : SUCCESS | FAILURE
+    ca.c -> X509 : X509_CRL_set1_nextUpdate()
+    ca.c <-- X509 : SUCCESS | FAILURE
+end
+group Add revoked certificates into the list
+    ca.c -> Certifactes : getRevokeCertificates()
+    ca.c <-- Certifactes : X509_CERT *certs
+    loop for each revoked certificate
+        ca.c -> X509 : X509_REVOKED_new()
+        ca.c <-- X509 : X509_REVOKED *revoke
+        ca.c -> X509 : X509_REVOKED_set_serialNumber(serialNo)
+        ca.c <-- X509 : SUCCESS | FAILURE
+        ca.c -> X509 : X509_CRL_add0_revoked(crl, revoke)
+        ca.c <-- X509 : SUCCESS | FAILURE
+        ca.c -> X509 : X509_CRL_sort(crl)
+        ca.c <-- X509 : SUCCESS | FAILURE
+    end
+end
+group Sign Certificate Revocation List
+    ca.c -> X509 : X509_CRL_sign(crl, pkey ...)
+    ca.c <-- X509 : SUCCESS | FAILURE
+end
+group Write Certificate Revocation List
+    ca.c -> X509 : PEM_write_bio_X509_CRL(crl)
+    ca.c <-- X509 : SUCCESS | FAILURE
+end
+@enduml

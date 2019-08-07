@@ -1,0 +1,63 @@
+@startuml
+participant ca.c
+participant x509
+database Certifactes
+group Load CA and check certificate validity
+  ca.c -> ca.c : EVP_PKEY *cakey = load_key()
+  ca.c -> ca.c : X509 *cacert = load_cert()
+  ca.c -> x509 : X509_check_private_key(cacert, cakey)
+  ca.c <-- x509 : SUCCESS|FAILURE
+end
+
+group Load CSR and check validity
+  ca.c -> x509 : PEM_read_bio_X509_REQ
+  ca.c <-- x509 : X509_REQ *req
+  alt if self-signed
+    ca.c -> x509 : X509_REQ_check_private_key(req, cakey)
+    ca.c <-- x509 : SUCCESS|FAILURE
+  end
+  ca.c -> x509 : X509_REQ_get0_pubkey(req)
+  ca.c <-- x509 : EVP_PKEY *pkreq
+  ca.c -> x509 : X509_REQ_verify(req, pkreq)
+  ca.c <-- x509 : SUCCESS|FAILURE
+end
+
+group Create certificate from CSR
+  group New serial number
+  	ca.c -> ca.c : Generate serial no
+    ca.c -> Certifactes : Check for uniqueness
+    ca.c <-- Certifactes : SUCCESS|FAILURE
+  end
+  ca.c -> x509 : X509_set_serialNumber()
+  ca.c <-- x509 : SUCCESS|FAILURE
+  ca.c -> x509 : X509_REQ_get_subject_name(req)
+  ca.c <-- x509 : X509_NAME *name
+  ca.c -> x509 : X509_get_subject_name(cacert)
+  ca.c <-- x509 : X509_NAME *caname
+  alt check policy
+    ca.c -> ca.c : check_policy(name, caname)
+  end
+  ca.c -> x509 : X509_set_issuer_name(ret, caname)
+  ca.c <-- x509 : SUCCESS|FAILURE
+  ca.c -> x509 : X509_set_subject_name(name)
+  ca.c <-- x509 : SUCCESS|FAILURE
+  ca.c -> ca.c : set_cert_times()
+  ca.c -> x509 : X509_REQ_get0_pubkey(req)
+  ca.c <-- x509 : EVP_PKEY *pubkey
+  ca.c -> x509 : X509_set_pubkey(pubkey)
+  ca.c <-- x509 : SUCCESS|FAILURE
+  alt Add v3 extensions
+    ca.c -> ca.c : X509V3_set_nconf(...)
+    note right: From config
+    ca.c -> ca.c : copy_extensions(...)
+    note right: from CSR
+  end
+  ca.c -> x509 : X509_sign
+  ca.c <-- x509 : SUCCESS|FAILURE
+end
+
+group Database storage
+  ca.c -> Certifactes : Store certifcate
+  ca.c <-- Certifactes : SUCCESS|FAILURE
+end
+@enduml

@@ -22,3 +22,7 @@ docs/
 
 # Code coverage
 *.lst
+
+# Other
+.vscode/
+*test-library
