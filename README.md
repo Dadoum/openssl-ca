@@ -6,13 +6,6 @@ This project contain wrapper-classes for most of the x509 parts in the OpenSSL
 API. The wrappers makes error-handling and memory-managment easier compared to
 use the plain C-style D API.
 
-**Note:** This project is dependent on dub package openssl which is not fully
-uplifted to openssl version 1.1.0h. A pull request exists which at the moment
-still waits to be merged into master. Hence you need to manually clone the
-origin of the pull request @ `https://github.com/1nfiniteloop/openssl.git` and
-checkout branch `x509-uplift-squashed`. Add this package as a local override
-with: `dub add-override`.
-
 ## Usage
 
 Run unittests with `dub test`.
@@ -42,3 +35,11 @@ MIT
 ## Future work
 
 * Implement certificate revocation.
+
+## References
+
+Some sources of inspiration used within this project:
+
+* OpenSSL api: <https://www.openssl.org/docs/manmaster/man3/>
+* OpenSSL source: <https://github.com/openssl/openssl>
+
