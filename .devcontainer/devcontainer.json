@@ -3,9 +3,6 @@
 	"name": "dlang",
 	"dockerFile": "Dockerfile",
 	"extensions": [
-		"ms-vscode.cpptools",
-		"twxs.cmake",
-		"vector-of-bool.cmake-tools",
 		"webfreak.code-d"
 	],
 	"runArgs": [
