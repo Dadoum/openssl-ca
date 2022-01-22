@@ -3,7 +3,7 @@ module infiniteloop.openssl.stubs.x509_subj;
 
 static immutable string[string] stringFormattedSubject;
 
-static this()
+shared static this()
 {
     stringFormattedSubject =  [
         "C": "SE",
