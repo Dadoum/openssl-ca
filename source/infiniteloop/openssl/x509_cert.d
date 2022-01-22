@@ -72,11 +72,10 @@ class X509Certificate
     {
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(pkey);
+        cert.setPublicKey(key);
         cert.setValidityTime(375);
-        cert.sign(pkey);
+        cert.sign(key);
         assertNotThrown!OpenSSLError(
             new X509Certificate(cert.toPEM()),  "Expects to create a certificate successfully from a PEM formatted string"
         );
@@ -106,10 +105,9 @@ class X509Certificate
     {
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
         assertNotThrown!OpenSSLError(
-            cert.setPublicKey(pkey), "Expects to successfully set certificate public key"
+            cert.setPublicKey(key), "Expects to successfully set certificate public key"
         );
     }
 
@@ -123,9 +121,8 @@ class X509Certificate
     {
         import infiniteloop.openssl.stubs.rsa : key;
 
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(pkey);
+        cert.setPublicKey(key);
         auto fetchedKey = cert.getPublicKey();
         // ***TODO*** how to assert??
     }
@@ -296,9 +293,8 @@ class X509Certificate
     {
         import infiniteloop.openssl.stubs.rsa:key;
         import std.exception:assertNotThrown;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(pkey);
+        cert.setPublicKey(key);
         string[string] extensions = [
             "subjectKeyIdentifier": "hash",
             "basicConstraints": "critical, CA:true",
@@ -313,9 +309,8 @@ class X509Certificate
     {
         import infiniteloop.openssl.stubs.rsa:key;
         import std.exception:assertNotThrown;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(pkey);
+        cert.setPublicKey(key);
         string[string] extensions = [
             "basicConstraints": "critical, CA:true",
             "authorityKeyIdentifier": "keyid:always,issuer",
@@ -338,6 +333,10 @@ class X509Certificate
 
     void sign(EVPKey key, MessageDigest md = MessageDigest.SHA_256)
     {
+        if (key.getKeyType() == KeyType.ED25519)
+        {
+            md = MessageDigest.NONE;  // MessageDigest must be null for elliptic curves.
+        }
         enforce!OpenSSLError(
             0 != X509_sign(certificate, key.c_type(), getEvpMessageDigest(md)), "Failed to sign Certificate"
         );
@@ -347,10 +346,9 @@ class X509Certificate
     {
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
         assertNotThrown!OpenSSLError(
-            cert.sign(pkey), "Expects to sign the certificate successfully"
+            cert.sign(key), "Expects to sign the certificate successfully"
         );
     }
 
@@ -362,22 +360,20 @@ class X509Certificate
     unittest /* Validate valid certificate */
     {
         import infiniteloop.openssl.stubs.rsa:key;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(pkey);
-        cert.sign(pkey);
-        bool res = cert.validateCertificateKey(pkey);
+        cert.setPublicKey(key);
+        cert.sign(key);
+        bool res = cert.validateCertificateKey(key);
         assert(res == true, "Expects to succeed validate the valid certificate");
     }
 
     unittest /* Validate invalid certificate */
     {
         import infiniteloop.openssl.stubs.rsa:key, anotherKey;
-        auto pkey = new EVPKey(key);
         auto cert = new X509Certificate();
-        cert.setPublicKey(new EVPKey(anotherKey));
-        cert.sign(pkey);
-        bool res = cert.validateCertificateKey(pkey);
+        cert.setPublicKey(anotherKey);
+        cert.sign(key);
+        bool res = cert.validateCertificateKey(key);
         assert(res == false, "Expects to fail validation since signing key and validation key are different");
     }
 

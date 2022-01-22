@@ -12,8 +12,15 @@ import deimos.openssl.pem;
 import infiniteloop.openssl.bio;
 import infiniteloop.openssl.error;
 import infiniteloop.openssl.password;
-import infiniteloop.openssl.rsa;
 
+// Brought from openssl v1.1.1:
+enum EVP_PKEY_ED25519 = 1087; // "NID_ED25519 = 1087" declared in "obj_mac.h", NID_ED25519 declared in "evp.h".
+
+enum KeyType
+{
+  RSA = EVP_PKEY_RSA,
+  ED25519 = EVP_PKEY_ED25519
+}
 
 enum Chiper
 {
@@ -33,6 +40,7 @@ const(EVP_CIPHER)* getEvpChiper(Chiper chiper)
 
 enum MessageDigest
 {
+    NONE,
     SHA_256
 }
 
@@ -44,6 +52,8 @@ const(EVP_MD)* getEvpMessageDigest(MessageDigest md)
             return EVP_sha256();
         case MessageDigest.SHA_256:
             return EVP_sha256();
+        case MessageDigest.NONE:
+            return null;
     }
 }
 
@@ -53,7 +63,6 @@ const(EVP_MD)* getEvpMessageDigest(MessageDigest md)
 class EVPKey
 {
     private EVP_PKEY *key;
-    private bool hasOwnership = true;  // Remove when deimos.openssl.evp is uplifted 1.1.0h
 
 public:
 
@@ -62,54 +71,18 @@ public:
         key = EVP_PKEY_new();
     }
 
-    this(RsaKey rsaKey)
-    {
-        key = EVP_PKEY_new();
-        enforce!OpenSSLError(
-            1 == EVP_PKEY_set1_RSA(key, rsaKey.c_type()), "Failed to create EVP Key from RSA Key"
-        );
-    }
-
-    unittest /* Create EVP key from an RSA key */
-    {
-        import std.exception:assertNotThrown;
-        import infiniteloop.openssl.stubs.rsa:key;
-        auto evpKey = new EVPKey(key);
-        assertNotThrown!OpenSSLError(
-            evpKey.toPEM(), "Expects to successfully convert EVP key to PEM formatted string"
-        );
-    }
-
-/*
-    this(EVP_PKEY *key)
-    {
-        EVP_PKEY_up_ref(key);  // doesn't exist. "deimos.openssl.evp" not uplifted to ver 1.1.0h.
-        this.key = key
-    }
-
-    this(EVP_PKEY *key)
-    {
-        this.key = EVP_PKEY_new();
-        EVP_PKEY_copy_parameters(this.key, key);  // segfaults. "deimos.openssl.evp" not uplifted to ver 1.1.0h.
-    }
-
-    this(EVP_PKEY *key)
-    {
-        this.key = EVP_PKEY_new();
-        auto ctx = EVP_PKEY_CTX_new();
-        this.key = EVP_PKEY_CTX_get0_pkey(ctx);  // segfaults. "deimos.openssl.evp" not uplifted to ver 1.1.0h.
-        EVP_PKEY_CTX_free(ctx);
-    }
-*/
-
-    this(EVP_PKEY *key)
+    protected this(EVP_PKEY *key)
     {
         this.key = key;
-        hasOwnership = false;
+    }
+
+    KeyType getKeyType() const
+    {
+      return to!KeyType(EVP_PKEY_base_id(this.key));
     }
 
     /**
-     * Read in an existing RSA key from string.
+     * Read in an existing key from string.
      */
     this(const string pemFormattedKey, const string password = "")
     {
@@ -119,45 +92,9 @@ public:
         bio.fromStr(pemFormattedKey);
     }
 
-    unittest /* Read an existing EVP key (RSA) from string */
-    {
-        import std.exception:assertNotThrown;
-        import infiniteloop.openssl.stubs.rsa:key;
-        auto evpKey = new EVPKey(key);
-        assertNotThrown!OpenSSLError(
-            new EVPKey(evpKey.toPEM()), "EVP key is expected to successfully be created from a PEM formatted string"
-        );
-    }
-
-    unittest /* Read an existing password-protected EVP key (RSA) from string */
-    {
-        import std.exception:assertNotThrown;
-        import infiniteloop.openssl.stubs.rsa:key;
-        string password = "secret";
-        auto evpKey = new EVPKey(key);
-        assertNotThrown!OpenSSLError(
-            new EVPKey(evpKey.toPEM(password), password), "Password protected EVP key is expected to successfully be created from a PEM formatted string"
-        );
-    }
-
-    unittest /* Read an existing password-protected EVP key (RSA) from string, with incorrect password */
-    {
-        import infiniteloop.openssl.stubs.rsa:key;
-        import infiniteloop.openssl.error:OpenSSLError;
-        import std.exception:assertThrown;
-        auto evpKey = new EVPKey(key);
-        auto evpKeyEncoded = evpKey.toPEM("secret");
-        assertThrown!OpenSSLError(
-            new EVPKey(evpKeyEncoded, "faulty-password"), "Expects to fail reading EVP key with incorrect password"
-        );
-    }
-
     ~this()
     {
-        if (hasOwnership)
-        {
-            EVP_PKEY_free(key);
-        }
+        EVP_PKEY_free(key);
     }
 
     const(string) toPEM(const string password = "", Chiper chiper = Chiper.AES_256_CBC)
@@ -170,26 +107,6 @@ public:
         {
             return toPEM(new Password());
         }
-    }
-
-    unittest /* Output private key (RSA) in ascii */
-    {
-        import infiniteloop.openssl.stubs.rsa:key;
-        import std.algorithm:startsWith, endsWith;
-        auto evpKey = new EVPKey(key);
-        string str = evpKey.toPEM();
-        assert(startsWith(str, "-----BEGIN PRIVATE KEY-----", ), "PEM formatted EVP key expects to have a matching header");
-        assert(endsWith(str, "-----END PRIVATE KEY-----\n"), "PEM formatted EVP key expects to have a matching footer");
-    }
-
-    unittest /* Output private key (RSA) in ascii, password protected */
-    {
-        import infiniteloop.openssl.stubs.rsa:key;
-        import std.algorithm:startsWith, endsWith;
-        auto evpKey = new EVPKey(key);
-        string str = evpKey.toPEM("secret-password");
-        assert(startsWith(str, "-----BEGIN ENCRYPTED PRIVATE KEY-----", ), "PEM formatted EVP key expects to have a matching header");
-        assert(endsWith(str, "-----END ENCRYPTED PRIVATE KEY-----\n"), "PEM formatted EVP key expects to have a matching footer");
     }
 
     /**

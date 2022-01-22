@@ -3,6 +3,7 @@ module infiniteloop.openssl.rsa;
 import core.stdc.stdlib;
 import core.stdc.string;
 import std.conv:to;
+import std.exception:enforce;
 import std.format:format;
 import std.string:toStringz;
 
@@ -32,16 +33,38 @@ struct RsaKeyConfig
  * https://github.com/openssl/openssl/blob/OpenSSL_1_1_0-stable/apps/genrsa.c
  * https://github.com/openssl/openssl/blob/OpenSSL_1_1_0-stable/apps/rsa.c
  */
-class RsaKey
+class RsaKey : EVPKey
 {
-    private RSA *rsaKey;
 
     /**
      * Creates a new RSA Key according to configuration
      */
     this(const RsaKeyConfig config)
     {
-        rsaKey = newKey(config);
+        RSA *rsaKey = RSA_new();
+        BIGNUM *exponent = BN_new();
+        BN_set_word(exponent, config.exp);
+        immutable int res = RSA_generate_key_ex(rsaKey, config.bits, exponent, null /* callback */);
+        // ver >= 1.1.0h: RSA_generate_multi_prime_key(rsaKey, config.bits, config.primes, exponent, null /* callback */);
+        BN_free(exponent);
+        if (res != 1)
+        {
+            throw new OpenSSLError("Failed to generate RSA key");
+        }
+        EVP_PKEY *key = EVP_PKEY_new();
+        enforce!OpenSSLError(
+            1 == EVP_PKEY_set1_RSA(key, rsaKey), "Failed to create EVP Key from RSA Key"
+        );
+        RSA_free(rsaKey);
+        super(key);
+    }
+
+    /**
+     * Read in an existing key from string.
+     */
+    this(const string pemFormattedKey, const string password = "")
+    {
+        super(pemFormattedKey, password);
     }
 
     unittest /* Generate RSA key */
@@ -58,24 +81,6 @@ class RsaKey
         assertThrown!OpenSSLError(
             new RsaKey(RsaKeyConfig(0)), "Expects to fail create RSA key using incorrect key configuration"
         );
-    }
-
-    unittest /* Validate RSA private key */
-    {
-        auto key = new RsaKey(RsaKeyConfig(512));
-        assert(1 == RSA_check_key(key.c_type()), "RSA key validation expects to succeed");
-    }
-
-    /**
-     * Read in an existing RSA key from string.
-     */
-    this(const string pemFormattedKey, const string password = "")
-    {
-        auto bio = new Bio(
-            (BIO* mem) => null != PEM_read_bio_RSAPrivateKey(mem, &rsaKey, &passwordCallbackWrapper,
-                                        cast(void*)toStringz(password))
-        );
-        bio.fromStr(pemFormattedKey);
     }
 
     unittest /* Read an existing RSA key from string */
@@ -107,45 +112,10 @@ class RsaKey
         );
     }
 
-    ~this()
+    unittest /* Output key type RSA */
     {
-        RSA_free(rsaKey);
-    }
-
-    private RSA* newKey(const RsaKeyConfig config) const
-    {
-        RSA *key = RSA_new();
-        BIGNUM *exponent = BN_new();
-        BN_set_word(exponent, config.exp);
-        immutable int res = RSA_generate_key_ex(key, config.bits, exponent, null /* callback */);
-        // ver >= 1.1.0h: RSA_generate_multi_prime_key(key, config.bits, config.primes, exponent, null /* callback */);
-        BN_free(exponent);
-        if (res != 1)
-        {
-            throw new OpenSSLError("Failed to generate RSA key");
-        }
-        return key;
-    }
-
-    const(string) toPEM(const string password = "", Chiper chiper = Chiper.AES_256_CBC)
-    {
-        if (password.length)
-        {
-            return toPEM(new Password(password, chiper));
-        }
-        else
-        {
-            return toPEM(new Password());
-        }
-    }
-
-    private const(string) toPEM(Password password)
-    {
-        auto bio = new Bio(
-            (BIO* mem) => 1 == PEM_write_bio_RSAPrivateKey(mem, rsaKey, password.getChiper(), password.getPassword(),
-                                    password.getLength(), null /* password callback */, null /* callback data */ )
-        );
-        return bio.to!string;
+        import infiniteloop.openssl.stubs.rsa:key;
+        assert(key.getKeyType()== KeyType.RSA, "Expected to return key type RSA");
     }
 
     unittest /* Output private key in ascii */
@@ -153,8 +123,8 @@ class RsaKey
         import std.algorithm:startsWith, endsWith;
         auto key = new RsaKey(RsaKeyConfig(512));
         string str = key.toPEM();
-        assert(startsWith(str, "-----BEGIN RSA PRIVATE KEY-----", ), "PEM formatted RSA key expects to have a matching header");
-        assert(endsWith(str, "-----END RSA PRIVATE KEY-----\n"), "PEM formatted RSA key expects to have a matching footer");
+        assert(startsWith(str, "-----BEGIN PRIVATE KEY-----", ), "PEM formatted RSA key expects to have a matching header");
+        assert(endsWith(str, "-----END PRIVATE KEY-----\n"), "PEM formatted RSA key expects to have a matching footer");
     }
 
     unittest /* Output private key in ascii, password protected */
@@ -162,15 +132,7 @@ class RsaKey
         import std.algorithm:startsWith, endsWith;
         auto key = new RsaKey(RsaKeyConfig(512));
         string str = key.toPEM("secret-password");
-        assert(startsWith(str, "-----BEGIN RSA PRIVATE KEY-----", ), "PEM formatted RSA key expects to have a matching header");
-        assert(endsWith(str, "-----END RSA PRIVATE KEY-----\n"), "PEM formatted RSA key expects to have a matching footer");
-    }
-
-    /**
-     * Return the raw contained type when using with C API.
-     */
-    RSA* c_type()
-    {
-        return rsaKey;
+        assert(startsWith(str, "-----BEGIN ENCRYPTED PRIVATE KEY-----", ), "PEM formatted RSA key expects to have a matching header");
+        assert(endsWith(str, "-----END ENCRYPTED PRIVATE KEY-----\n"), "PEM formatted RSA key expects to have a matching footer");
     }
 }

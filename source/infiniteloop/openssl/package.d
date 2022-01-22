@@ -1,5 +1,6 @@
 module infiniteloop.openssl;
 
+public import infiniteloop.openssl.ed25519;
 public import infiniteloop.openssl.error;
 public import infiniteloop.openssl.evp;
 public import infiniteloop.openssl.rsa;

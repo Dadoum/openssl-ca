@@ -64,10 +64,9 @@ class X509CertificateSigningRequest
     {
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
-        auto pkey = new EVPKey(key);
         auto csr = new X509CertificateSigningRequest();
-        csr.setPublicKey(pkey);
-        csr.sign(pkey);
+        csr.setPublicKey(key);
+        csr.sign(key);
         assertNotThrown!OpenSSLError(
             new X509CertificateSigningRequest(csr.toPEM()), "Expects to create a certificate signing request successfully from a PEM formatted string"
         );
@@ -160,10 +159,9 @@ class X509CertificateSigningRequest
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
 
-        auto pkey = new EVPKey(key);
         auto csr = new X509CertificateSigningRequest();
         assertNotThrown!OpenSSLError(
-            csr.setPublicKey(pkey), "Expect to successfully set the public key of the certificate signing request"
+            csr.setPublicKey(key), "Expect to successfully set the public key of the certificate signing request"
         );
     }
 
@@ -178,9 +176,8 @@ class X509CertificateSigningRequest
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa : key;
 
-        auto pkey = new EVPKey(key);
         auto csr = new X509CertificateSigningRequest();
-        csr.setPublicKey(pkey);
+        csr.setPublicKey(key);
         assertNotThrown!OpenSSLError(
             csr.getPublicKey(), "Expect to successfully return the public key of the certificate signing request"
         );
@@ -223,6 +220,10 @@ class X509CertificateSigningRequest
 
     void sign(EVPKey key, MessageDigest md = MessageDigest.SHA_256)
     {
+        if (key.getKeyType() == KeyType.ED25519)
+        {
+            md = MessageDigest.NONE; // MessageDigest must be null for elliptic curves.
+        }
         enforce!OpenSSLError(
             0 != X509_REQ_sign(csr, key.c_type(), getEvpMessageDigest(md)), "Failed to sign Certificate Signing Request"
         );
@@ -233,10 +234,9 @@ class X509CertificateSigningRequest
         import std.exception:assertNotThrown;
         import infiniteloop.openssl.stubs.rsa:key;
 
-        auto pkey = new EVPKey(key);
         auto csr = new X509CertificateSigningRequest();
         assertNotThrown!OpenSSLError(
-            csr.sign(pkey), "Expects to sign certificate with success"
+            csr.sign(key), "Expects to sign certificate with success"
         );
     }
 
@@ -250,10 +250,9 @@ class X509CertificateSigningRequest
     {
         import infiniteloop.openssl.stubs.rsa:key;
 
-        auto pkey = new EVPKey(key);
         auto csr = new X509CertificateSigningRequest();
-        csr.setPublicKey(pkey);
-        csr.sign(pkey);
+        csr.setPublicKey(key);
+        csr.sign(key);
         bool res = csr.validateSignature();
         assert(res == true, "Expecteded to succeed on Certificate Signing Request validation");
     }
@@ -263,8 +262,8 @@ class X509CertificateSigningRequest
         import infiniteloop.openssl.stubs.rsa:key, anotherKey;
 
         auto csr = new X509CertificateSigningRequest();
-        csr.setPublicKey(new EVPKey(key));
-        csr.sign(new EVPKey(anotherKey));
+        csr.setPublicKey(key);
+        csr.sign(anotherKey);
         bool res = csr.validateSignature();
         assert(res == false, "Expecteded to fail on Certificate Signing Request validation");
     }
