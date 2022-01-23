@@ -10,7 +10,6 @@ static RsaKey anotherKey;
 
 static this()
 {
-    key = new RsaKey(RsaKeyConfig(512));
-    anotherKey = new RsaKey(RsaKeyConfig(512));
+  key = new RsaKey(RsaKeyConfig(512));
+  anotherKey = new RsaKey(RsaKeyConfig(512));
 }
-
