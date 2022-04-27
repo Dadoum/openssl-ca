@@ -1,5 +1,10 @@
 # openssl-ca
 
+## This project is archived
+
+Because the demios openssl c bindings this library depends on is not actively
+maintained.
+
 ## Description
 
 This project contain wrapper-classes for most of the x509 parts in the OpenSSL
@@ -32,14 +37,9 @@ on the host is that Docker is installed.
 
 MIT
 
-## Future work
-
-* Implement certificate revocation.
-
 ## References
 
 Some sources of inspiration used within this project:
 
 * OpenSSL api: <https://www.openssl.org/docs/manmaster/man3/>
 * OpenSSL source: <https://github.com/openssl/openssl>
-
