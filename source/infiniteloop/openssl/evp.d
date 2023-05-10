@@ -13,9 +13,6 @@ import infiniteloop.openssl.bio;
 import infiniteloop.openssl.error;
 import infiniteloop.openssl.password;
 
-// Brought from openssl v1.1.1:
-enum EVP_PKEY_ED25519 = 1087; // "NID_ED25519 = 1087" declared in "obj_mac.h", NID_ED25519 declared in "evp.h".
-
 enum KeyType
 {
   RSA = EVP_PKEY_RSA,

@@ -1,10 +1,5 @@
 # openssl-ca
 
-## This project is archived
-
-Because the demios openssl c bindings this library depends on is not actively
-maintained.
-
 ## Description
 
 This project contain wrapper-classes for most of the x509 parts in the OpenSSL
